@@ -127,12 +127,12 @@ def simulate(interface, user, agent, experiment_settings, n_trials=5, n_iters=10
 if __name__ == "__main__":
 
     #=== init params
-    N_TRIALS = 1
-    N_ITERS = 1
+    N_TRIALS = 3
+    N_ITERS = 5
     THETA_U = (.2, 0.2)
     N_ARMS = (50, 50)
     GENERATE_NEW_EXP = True
-    EXP_PATH = PATH+"trials/exp_28/"
+    EXP_PATH = PATH+"trials/exp_30/"
     
     
     if not os.path.exists(EXP_PATH):

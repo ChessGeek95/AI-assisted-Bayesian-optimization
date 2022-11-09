@@ -49,7 +49,7 @@ class GreedyUser:
         points = np.vstack((x.flatten(), y.flatten())).T
         mu, var = self.current_prediction(points)
         #var = var.diagonal()
-        ubc_scores = mu + self.beta * np.sqrt(np.abs(var))
+        ubc_scores = mu + self.beta * var
         action = np.argmax(ubc_scores)
         print("action:", action, " ==> ", ubc_scores[action])
         print("ucb_scores:", ubc_scores)

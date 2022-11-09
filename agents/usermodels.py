@@ -33,7 +33,7 @@ class UserModel:
         mu, var = self.current_prediction(points)
         var = var.diagonal()
         mu = mu.reshape(-1,)
-        ubc_scores = mu + self.beta * np.sqrt(np.abs(var))
+        ubc_scores = mu + self.beta * var
         action = np.argmax(ubc_scores)
         self.cur = (ai_action, action)
         self.xy_queries.append(self.cur)

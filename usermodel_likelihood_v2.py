@@ -10,6 +10,14 @@ import scipy.stats
 from scipy.special import ndtr as std_normal_cdf
 from wandb import agent #fast numerical integration for standard normal cdf
 
+import os
+import numpy as np
+import pandas as pd
+from matplotlib import pyplot as plt
+from scipy.optimize import minimize
+import emcee as mc
+
+
 from trial import Trial
 from utils import PATH
 
@@ -150,7 +158,7 @@ def comp_ucb_scores(alpha, beta, xy_quers, z_quers, xy_p, z_p):
     for i in range(n_iters):
         points = np.vstack((x[i].flatten(), y[i].flatten())).T
         mu, std = gp_model.predict(points, return_std=True)
-        ucb_scores[i*y_arms:(i+1)*y_arms] = mu.reshape(-1,) + beta * np.sqrt(np.abs(std))
+        ucb_scores[i*y_arms:(i+1)*y_arms] = mu.reshape(-1,) + beta * std
 
         mu = gp_model.predict([xy_quers[i]])
         biased_z = alpha * mu + (1-alpha) * z_quers[i]
@@ -208,7 +216,7 @@ def comp_ucb_scores(alpha, beta, xy_quers, z_quers):
 sigma = 0.001
 
 
-expr = "exp_27"
+expr = "exp_30"
 trial_num = 2
 iters_num = 5
 
@@ -224,13 +232,13 @@ params = [[(i/(10),j/(10)) for i in range(1, n_part+1)] for j in range(1, n_part
 
 x_arms, y_arms = trial_1.n_arms
 #alpha, beta = trial_1.user_params
-print("True params: ",trial_1.user_params)
+#print("True params: ",trial_1.user_params)
 #alpha, beta = (0.1, 0.8)
 xy_queries = trial_1.xy_queries[:iters_num]
 z_queries = trial_1.z_queries[:iters_num]
 user_xy = trial_1.user_data
 user_z = trial_1.user_data_z
-print("num init points: ", len(user_xy))
+#print("num init points: ", len(user_xy))
 
 """
 alpha, beta = trial_1.user_params
@@ -239,7 +247,7 @@ z_q = deepcopy(z_queries)
 ucb_scores = comp_ucb_scores(alpha, beta, xy_q, z_q)
 
 """
-
+"""
 #===========================================================
 ll_list = np.zeros_like(params)
 for ii in range(ll_list.shape[0]):
@@ -265,4 +273,67 @@ for i in range(n_part):
         #print(np.round(params[j][i], 2), " ==> ", np.round(ll_list[j,i][0],3))
         print(np.round(params[i][j], 2), " ==> ", np.round(ll_list[i,j][0],3))
     
+#"""
+
+def log_likelihood(theta,data):
+    alpha, beta = theta
+    xy_q, z_q, user_xy, user_z = data[0]
+
+    ucb_scores = comp_ucb_scores(alpha, beta, xy_q, z_q, user_xy, user_z)
+    likclass = UsermodelLikelihood(y_arms)
+    likclass.update_indices_bookeeping(len(ucb_scores))
+    ll = likclass.likelihood(ucb_scores, sigma)
+    return ll
+
+
+theta = (0.2, 0.2)
+data = [(xy_queries, z_queries, user_xy, user_z)]
+"""
+nll = log_likelihood(theta, data)
+print(nll)
+"""
+
+
+nll = lambda *args: -log_likelihood(*args)
+sol = minimize(nll,[0.3,0.1],args=(data), bounds=((0,1), (0,1)))
+#print(sol.res)
+print(sol)
+
+
+def log_prior(theta):
+    alpha, beta = theta
+    if 0 <= alpha <= 1 and 0 <= beta <=1:
+        return 0.0
+    return -np.inf
+
+def log_probability(theta):
+    lp = log_prior(theta)
+    if not np.isfinite(lp):
+        return -np.inf
+    return lp + log_likelihood(theta, data)
+
+
+#Initialize around MLE of (alpha,beta), and set 10 MC-chains
+pos = sol.x + [0.1,0.1] * np.random.randn(10, 2)
+nwalkers, ndim = pos.shape
+
+#print(nwalkers, ndim)
+
+sampler = mc.EnsembleSampler(nwalkers, ndim, log_probability)
+sampler.run_mcmc(pos,2000,progress=True)
+
+samples = sampler.get_chain()
+
+fig, axs = plt.subplots(2,figsize=[8,15])
+axs[0].plot(samples[:,0:3,0])
+axs[1].plot(samples[:,0:3,1])
+#axs[2].plot(samples[:,0:3,2])
+#axs[3].plot(samples[:,0:3,3])
+#axs[4].plot(samples[:,0:3,4])
+plt.savefig(PATH+'fig_5.png')
+
+fig, axs = plt.subplots(2,figsize=[5,12])
+axs[0].hist(samples[1000:,:,0].flatten())
+axs[1].hist(samples[1000:,:,1].flatten())
+plt.savefig(PATH+'fig_6.png')
 #"""
