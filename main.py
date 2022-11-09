@@ -41,10 +41,10 @@ def simulate(interface, user, agent, experiment_settings, n_trials=5, n_iters=10
                                                 start_point)
         user.reset(user_data)
         agent.reset(agent_data, user_data)
+        
+        trial.add_prior_data(agent_data, user_data)
         trial.add_belief(user.current_prediction(cur=False), agent.current_prediction(cur=False))
-        #print(user.__class__.__name__, "prior size:", user_data[0].shape)
-        #print(agent.__class__.__name__, "data size", agent_data[0].shape)
-        #print()
+        
 
         #print("settings ### m:", m, " start:", start_point)
         """
@@ -127,12 +127,12 @@ def simulate(interface, user, agent, experiment_settings, n_trials=5, n_iters=10
 if __name__ == "__main__":
 
     #=== init params
-    N_TRIALS = 2
-    N_ITERS = 10
-    THETA_U = (.2, 0.5)
+    N_TRIALS = 1
+    N_ITERS = 1
+    THETA_U = (.2, 0.2)
     N_ARMS = (50, 50)
     GENERATE_NEW_EXP = True
-    EXP_PATH = PATH+"trials/exp_25/"
+    EXP_PATH = PATH+"trials/exp_28/"
     
     
     if not os.path.exists(EXP_PATH):
@@ -159,7 +159,7 @@ if __name__ == "__main__":
     
     #=== init the synthetic user
     kernel = ConstantKernel(5, constant_value_bounds="fixed") * RBF(10, length_scale_bounds="fixed")
-    gp_model = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=10, alpha=1e-3)
+    gp_model = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=10, alpha=2e-2)
     user = GreedyUser(gp_model, N_ARMS, interface.get_cur(), THETA_U)
 
     #=== init the AI agent
@@ -170,7 +170,7 @@ if __name__ == "__main__":
     #=== run the experiment
     np.random.seed(987654321)
     scores_baseline = simulate(interface, user, greedy_agent, expr_settings, N_TRIALS, N_ITERS, name="GreedyAI")
-    scores_my_method = simulate(interface, user, strategic_agent, expr_settings, N_TRIALS, N_ITERS, name="PlanningAI")
+    #scores_my_method = simulate(interface, user, strategic_agent, expr_settings, N_TRIALS, N_ITERS, name="PlanningAI")
     #"""
     #np.save(PATH + 'results/base.npy', scores_baseline)
     #np.save(PATH + 'results/mine.npy', scores_my_method)

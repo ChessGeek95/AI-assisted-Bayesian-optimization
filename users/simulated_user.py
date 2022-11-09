@@ -51,6 +51,10 @@ class GreedyUser:
         #var = var.diagonal()
         ubc_scores = mu + self.beta * np.sqrt(np.abs(var))
         action = np.argmax(ubc_scores)
+        print("action:", action, " ==> ", ubc_scores[action])
+        print("ucb_scores:", ubc_scores)
+        
+
         self.cur = (agent_action, action)
         self.xy_queries.append(self.cur)
         return action

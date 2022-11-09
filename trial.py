@@ -35,6 +35,10 @@ class Trial:
         self.xy_queries = None
         self.z_queries = None
 
+    def add_prior_data(self, agent_data, user_data):
+        self.agent_data_z = agent_data[1]
+        self.user_data_z = user_data[1]
+
     def add_belief(self, user_belief, agent_belief, user_model_beleif=None):
         user_belief = (user_belief[0], user_belief[1])
         agent_belief = (agent_belief[0], agent_belief[1])
