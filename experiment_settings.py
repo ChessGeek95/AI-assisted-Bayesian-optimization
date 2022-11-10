@@ -23,17 +23,22 @@ class ExperimentSettings:
         self.generate_trials()
         
     
-    def generate_trials(self):
-        self.function_args = np.random.choice(4, size=(self.n_trials,))
+    def generate_trials(self, func_type = 3):
+        if func_type == 3:
+            self.function_args = np.random.random(size=(self.n_trials,4))*0.8 + 1.2
+            self.function_args *= [7, 3, 1.2, .5] #[9, 4, 1.7, 0.5]
+            self.function_args = np.array([np.random.permutation(self.function_args[i]) for i in range(self.n_trials)])
+        else:
+            self.function_args = np.random.choice(4, size=(self.n_trials,))
         self.starting_points = np.random.randint(low=(0,0), high=self.n_arms, size=(self.n_trials,2))
         self.function_list = []
         self.user_data_list = []
         self.agent_data_list = []
         for i in range(self.n_trials):
             function, user_data, agent_data = self.__generate_func(n_regions=2, 
-                                                                    n_samples=5, 
+                                                                    n_samples=6, 
                                                                     random_regions=False,
-                                                                    function_type=2,
+                                                                    function_type=func_type,
                                                                     args=self.function_args[i])
             self.function_list.append(function)
             self.user_data_list.append(user_data)
@@ -50,7 +55,9 @@ class ExperimentSettings:
             return self._periodic_function(n_regions, n_samples, random_regions, args)
         elif function_type == 2:
             return self._himmelblau_function(n_regions, n_samples, random_regions, args=args)
-    
+        elif function_type == 3:
+            return self._custom_4modal_function(n_regions, n_samples, random_regions, args=args)
+            
     
     def _random_function(self, n_regions=2, n_samples=2, random_regions=False):
         """
@@ -101,17 +108,6 @@ class ExperimentSettings:
         p = roots[args]
         
         f = lambda x,y: -1 * (x**2 + y - 11)**2 - 1 * (x + y**2 - 7)**2 - 10 * ((x-p[0])**2 + (y-p[1])**2)**0.5
-        """
-        def f(x, y):
-            dist = ((x-p[0])**2 + (y-p[1])**2)**0.5
-            val = -1 * (x**2 + y - 11)**2 - 1 * (x + y**2 - 7)**2 - 10 * dist
-            print(np.min(val), np.max(val))
-            b = np.zeros_like(val)
-            b[dist>2] -= 1
-            val += b
-            return b
-        """
-
 
         x, y = np.meshgrid(np.linspace(-5,5,self.n_arms[0]), np.linspace(-5,5,self.n_arms[1]))
 
@@ -126,7 +122,56 @@ class ExperimentSettings:
         else:
             user_data, agent_data = self._split_regions_to_four(n_samples, who=0)
         return function_df, user_data, agent_data
-        
+
+    
+    
+    def _custom_4modal_function(self, n_regions=2, n_samples=5, random_regions=False, args=None):
+        p1 = (3, 2)
+        p2 = (-2.805118, 3.131312)
+        p3 = (-3.779310, -3.283186)
+        p4 = (3.584428, -1.848126)
+        roots = [p1, p2, p3, p4]
+        m = args # shape of (4,)
+        self.glob_opt = np.argmax(args)
+
+        def filter(x,y,p):
+            distance = ((x-p[0])**2 + (y-p[1])**2 + 0.5)**0.5
+            flt = 1/(distance+1)
+            return flt
+
+        def f (x,y,p,m): 
+            res_1 = -(x**2 + y - 11)**2 - (x + y**2 - 7)**2
+            res_1 -= np.min(res_1)
+            res_1 /= np.max(res_1)
+            res_1 **= 6
+            if m==0:
+                res_2 = np.zeros_like(res_1)
+            else:
+                #res_2 = -(np.abs(x-p[0])**2 + np.abs(y-p[1])**2)**0.5
+                res_2 = -(np.abs(x-p[0])**2 + np.abs(y-p[1])**2 + 1)**0.5
+                res_2 -= np.min(res_2)
+                res_2 /= np.max(res_2)
+                res_2 **= 14
+                res_2 = res_2  * m * filter(x,y,p)
+            res = res_1 + res_2
+            #res = res_2
+            return res
+
+        g = lambda x,y: f(x,y,roots[0], m[0]) + f(x,y,roots[1], m[1]) + f(x,y,roots[2], m[2]) + f(x,y,roots[3], m[3])
+
+        x, y = np.meshgrid(np.linspace(-5.5,5.5,self.n_arms[0]), np.linspace(-5.5,5.,self.n_arms[1]))
+        function_df = g(x,y)
+        function_df -= np.min(function_df)
+        function_df /= np.max(function_df)
+
+        if random_regions:
+            user_data, agent_data = self._random_regions(n_samples)
+        else:
+            user_data, agent_data = self._split_regions_to_four(n_samples, who=0)
+        return function_df, user_data, agent_data
+
+
+
 
     def _random_regions(self, n_samples):
         """
@@ -197,7 +242,7 @@ class ExperimentSettings:
         print("-"*30)
         """
         agent_data = []
-        n_samples = [3,1]
+        n_samples = [3,3]
         for i,r in enumerate(agent_regions):
             if n_samples[i]>0:
                 samples = np.random.randint(low=regions[r][0], high=regions[r][1], size=(n_samples[i],2))

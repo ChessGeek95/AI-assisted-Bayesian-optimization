@@ -51,8 +51,8 @@ class GreedyUser:
         #var = var.diagonal()
         ubc_scores = mu + self.beta * var
         action = np.argmax(ubc_scores)
-        print("action:", action, " ==> ", ubc_scores[action])
-        print("ucb_scores:", ubc_scores)
+        #print("action:", action, " ==> ", ubc_scores[action])
+        #print("ucb_scores:", ubc_scores)
         
 
         self.cur = (agent_action, action)

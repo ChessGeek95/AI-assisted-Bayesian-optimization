@@ -29,6 +29,7 @@ np.warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning)
 
 def simulate(interface, user, agent, experiment_settings, n_trials=5, n_iters=10, name=None):
     scores = np.zeros((n_trials, n_iters))
+    test_regions = [[],[],[],[]]
     for episode in range(n_trials):
         trial = Trial()
         trial.set_values(user, agent, interface, experiment_settings, n_iters, episode)
@@ -104,8 +105,8 @@ def simulate(interface, user, agent, experiment_settings, n_trials=5, n_iters=10
             pass
             pdf.close()
         """
-
-        print('$$$ ', episode+1, '=>', score[1])
+        test_regions[np.argmax(func_arg)].append(score[1])
+        print('$', episode+1, '=>', score[1], ' ==> ', np.argmax(func_arg),' ## ', np.round(func_arg,1))
         trial.add_queries(interface.xy_queries, interface.z_queries, scores[episode])
         trial.save(path=EXP_PATH+"tiral_"+str(experiment_settings.id)+"_"
                                             +str(episode)+"_"
@@ -114,6 +115,7 @@ def simulate(interface, user, agent, experiment_settings, n_trials=5, n_iters=10
     
     print('-'*25)
     print("Mean:", np.round(np.mean(scores[:,-1]),2))
+    print("Regions:", np.round([np.mean(test_regions[v]) for v in range(4)],2))
     #print("#"*50, '\n')
     # evaluate
     return scores
@@ -127,12 +129,12 @@ def simulate(interface, user, agent, experiment_settings, n_trials=5, n_iters=10
 if __name__ == "__main__":
 
     #=== init params
-    N_TRIALS = 3
-    N_ITERS = 5
-    THETA_U = (.2, 0.2)
-    N_ARMS = (50, 50)
+    N_TRIALS = 200
+    N_ITERS = 7
+    THETA_U = (.05, 0.25)
+    N_ARMS = (100, 100)
     GENERATE_NEW_EXP = True
-    EXP_PATH = PATH+"trials/exp_30/"
+    EXP_PATH = PATH+"trials/exp_temp/"
     
     
     if not os.path.exists(EXP_PATH):
