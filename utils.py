@@ -14,6 +14,9 @@ import pathlib
 PATH = str(pathlib.Path(__file__).parent.resolve())+'/'
 
 
+def eval_ucb_scores(mu, std, beta):
+    return mu + beta * std
+
 
 def omnisci_baseline(function_list, user_data_list, agent_data_list
                         , init_gp_list, n_arms, max_iter=10):

@@ -1,6 +1,6 @@
 from copy import deepcopy as cpy
 import numpy as np
-
+import utils
 
 """
 Should be reimplemented this way:
@@ -47,13 +47,9 @@ class GreedyUser:
         """
         x, y = np.meshgrid(agent_action, np.arange(self.y_arms))
         points = np.vstack((x.flatten(), y.flatten())).T
-        mu, var = self.current_prediction(points)
-        #var = var.diagonal()
-        ubc_scores = mu + self.beta * var
-        action = np.argmax(ubc_scores)
-        #print("action:", action, " ==> ", ubc_scores[action])
-        #print("ucb_scores:", ubc_scores)
-        
+        mu, std = self.current_prediction(points)
+        ucb_scores = utils.eval_ucb_scores(mu, std, self.beta)
+        action = np.argmax(ucb_scores)
 
         self.cur = (agent_action, action)
         self.xy_queries.append(self.cur)

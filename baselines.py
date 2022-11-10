@@ -1,5 +1,7 @@
 import numpy as np
 from copy import deepcopy as cpy
+import utils
+
 
 class UBC:
     def __init__(self, function_df, init_gp, n_arms, user_data, agent_data):
@@ -55,9 +57,8 @@ class UBC:
         """
         points_idx = np.random.choice(np.arange(len(self.all_points)), size=(100,), replace=False)
         points = self.all_points[points_idx]
-        mu, var = self.current_prediction(points)
-        #var = var.diagonal()
-        ucb_scores = mu + beta * np.sqrt(np.abs(var))
+        mu, std = self.current_prediction(points)
+        ucb_scores = utils.eval_ucb_scores(mu, std, beta)
         self.cur = points[np.argmax(ucb_scores)]        
         self.xy_queries.append(self.cur)
 

@@ -12,6 +12,7 @@ from agents.gym_games.envs import CorDesc2dEnv
 from agents.gym_games.envs.opt_game import OptGame
 from agents.usermodels import UserModel, UserModel_ABC, UserModel_Pyro
 from agents.approx_bayes import ABC
+import utils
 
 
 
@@ -95,23 +96,29 @@ class BaseAgent:
 
 
 class EpsGreedyAgent(BaseAgent):
-    def __init__(self, init_gp, n_arms, cur, eps=0):
+    def __init__(self, init_gp, n_arms, cur, beta=0.2):
         super().__init__(init_gp, n_arms, cur)
-        self.eps = eps # update for adjusting eps throughout interaction
+        self.beta = beta
 
     def take_action(self):
         """
         choosing y for the given x in self.cur to query
         """
-        if np.random.rand() < self.eps:
-            action = np.random.choice(np.arange(self.x_arms))
-        else:
-            x, y = np.meshgrid(np.arange(self.x_arms), self.cur[1])
-            points = np.vstack((x.flatten(), y.flatten())).T
-            action = np.argmax(self.current_prediction(points)[0]) # choosing the point with highest mu
+        x, y = np.meshgrid(np.arange(self.x_arms), self.cur[1])
+        points = np.vstack((x.flatten(), y.flatten())).T
+        mu, std = self.current_prediction(points)
+        ucb_scores = utils.eval_ucb_scores(mu, std, self.beta)
+        action = np.argmax(ucb_scores)
         self.cur = (action, self.cur[1])
-        #self.xy_queries.append(self.cur)
         return action
+
+        """
+        x, y = np.meshgrid(np.arange(self.x_arms), self.cur[1])
+        points = np.vstack((x.flatten(), y.flatten())).T
+        action = np.argmax(self.current_prediction(points)[0]) # choosing the point with highest mu
+        self.cur = (action, self.cur[1])
+        return action
+        """
         
 
 

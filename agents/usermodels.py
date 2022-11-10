@@ -1,5 +1,6 @@
 from copy import deepcopy as cpy
 import numpy as np
+import utils
 
 
 
@@ -24,17 +25,15 @@ class UserModel:
         z = np.append(z, self.z_u)
         self.gp.fit(xy, z)
 
-    def take_action(self, ai_action, eps=0):
+    def take_action(self, ai_action):
         """
         choosing y for the given x in self.cur to query
         """
         x, y = np.meshgrid(ai_action, np.arange(self.y_arms))
         points = np.vstack((x.flatten(), y.flatten())).T
-        mu, var = self.current_prediction(points)
-        var = var.diagonal()
-        mu = mu.reshape(-1,)
-        ubc_scores = mu + self.beta * var
-        action = np.argmax(ubc_scores)
+        mu, std = self.current_prediction(points)
+        ucb_scores = utils.eval_ucb_scores(mu, std, self.beta)
+        action = np.argmax(ucb_scores)
         self.cur = (ai_action, action)
         self.xy_queries.append(self.cur)
         return action
@@ -44,15 +43,18 @@ class UserModel:
         self.z_queries.append(biased_obs)
         self.__fit_gp()
 
-    def current_prediction(self, points=None, cur=True):
+    def current_prediction(self, points=None, cur=True, return_std=True, return_cov=False):
+        """
+        Computing the current prediction for the given point based on the GP
+        """
         if points is None:
-            if cur:
-                mu, Cov = self.gp.predict(np.array(self.cur).reshape(1,-1), return_cov=True)
-            else:
-                mu, Cov = self.gp.predict(self.all_points, return_cov=True)
-        else:
-            mu, Cov = self.gp.predict(points, return_cov=True)
-        return mu, Cov
+            if cur: # current point
+                res = self.gp.predict(np.array(self.cur).reshape(1,-1), return_std=return_std, return_cov=return_cov)
+            else: # all points in the 2D space
+                res = self.gp.predict(self.all_points, return_std=return_std, return_cov=return_cov)
+        else: # the given points
+            res = self.gp.predict(points, return_std=return_std, return_cov=return_cov)
+        return res
 
     def posterior_samples(self, n_samples=50000):
         z_samples = self.gp_model.sample_y(self.all_points, n_samples)
