@@ -7,8 +7,8 @@ import numpy as np
 from utils import PATH
 
 
-n_trials = 100
-expr = "exp_temp"
+n_trials = 25
+expr = "exp_1"
 
 init_gp_list = []
 user_data_list = []
@@ -32,8 +32,8 @@ scores_random = random_baseline(function_list, n_arms, n_iters)
 scores_omnisci = omnisci_baseline(function_list, user_data_list, agent_data_list, init_gp_list, n_arms, n_iters)
 
 print("plotting the comaprison ...")
-plot_compare([scores_random, scores_omnisci, scores_greedy], \
-                 ["Random", "CentUCB", "Greedy"], "plot_"+expr)
+#plot_compare([scores_random, scores_omnisci, scores_greedy], \
+#                 ["Random", "CentUCB", "Greedy"], "plot_"+expr)
 
 #print("comparing the trials ...")
 #compare_trials(scores_planning, scores_greedy, "res_"+expr)

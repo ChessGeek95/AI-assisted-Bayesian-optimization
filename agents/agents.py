@@ -233,8 +233,8 @@ class StrategicAgent(BaseAgent):
         
         #alpha_u = np.random.random(100)*0.1+0.35
         #beta_u = np.random.random(100)*0.05+0.1
-        alpha_u = np.random.normal(0.2, 0.02, size=(3000,))
-        beta_u = np.random.normal(0.2, 0.02, size=(3000,))
+        alpha_u = np.random.normal(0.5, 0.02, size=(3000,))
+        beta_u = np.random.normal(0.5, 0.02, size=(3000,))
         alpha_u = alpha_u[(alpha_u>=0) & (alpha_u<=1)]
         beta_u = beta_u[(beta_u>=0) & (beta_u<=1)]
         theta_u = (alpha_u, beta_u)

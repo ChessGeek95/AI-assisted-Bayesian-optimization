@@ -11,6 +11,8 @@ trials/
 # C extensions
 *.so
 
+temp.py
+
 .vscode
 
 # Distribution / packaging

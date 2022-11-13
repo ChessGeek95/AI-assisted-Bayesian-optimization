@@ -37,11 +37,11 @@ class Trial:
 
     def add_prior_data(self, agent_data, user_data):
         self.agent_data_z = agent_data[1]
-        self.user_data_z = user_data[1]
+        self.user_data_z = user_data[1]    
 
     def add_belief(self, user_belief, agent_belief, user_model_beleif=None):
-        user_belief = (user_belief[0], user_belief[1])
-        agent_belief = (agent_belief[0], agent_belief[1])
+        user_belief = (user_belief[0].astype(np.float16), user_belief[1].astype(np.float16))
+        agent_belief = (agent_belief[0].astype(np.float16), agent_belief[1].astype(np.float16))
         self.user_beliefs.append(user_belief)
         self.agent_beliefs.append(agent_belief)
     

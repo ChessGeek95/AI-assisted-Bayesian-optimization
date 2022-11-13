@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib
 import os
 
+from sklearn import utils
+
 from experiment_settings import ExperimentSettings
 from trial import Trial
 matplotlib.use('Agg')
@@ -19,9 +21,12 @@ from interface import Interface
 from users.simulated_user import GreedyUser
 from agents.agents import EpsGreedyAgent, StrategicAgent
 
-from utils import PATH
+from utils import PATH, create_readme
+import warnings
+from sklearn.exceptions import ConvergenceWarning
 
 np.warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning)
+warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
 
 
@@ -44,7 +49,8 @@ def simulate(interface, user, agent, experiment_settings, n_trials=5, n_iters=10
         agent.reset(agent_data, user_data)
         
         trial.add_prior_data(agent_data, user_data)
-        trial.add_belief(user.current_prediction(cur=False), agent.current_prediction(cur=False))
+        trial.add_belief(user.current_prediction(cur=False, return_std=False), 
+                        agent.current_prediction(cur=False, return_std=False))
         
 
         #print("settings ### m:", m, " start:", start_point)
@@ -129,9 +135,9 @@ def simulate(interface, user, agent, experiment_settings, n_trials=5, n_iters=10
 if __name__ == "__main__":
 
     #=== init params
-    N_TRIALS = 200
-    N_ITERS = 7
-    THETA_U = (.05, 0.25)
+    N_TRIALS = 1
+    N_ITERS = 5
+    THETA_U = (.5, 0.5)
     N_ARMS = (100, 100)
     GENERATE_NEW_EXP = True
     EXP_PATH = PATH+"trials/exp_temp/"
@@ -139,6 +145,11 @@ if __name__ == "__main__":
     
     if not os.path.exists(EXP_PATH):
         os.makedirs(EXP_PATH)
+
+    create_readme(EXP_PATH, ["N_TRIALS", N_TRIALS],
+                            ["N_ITERS", N_ITERS],
+                            ["THETA_U", THETA_U],
+                            ["N_ARMS", N_ARMS])
     
 
     expr_settings = ExperimentSettings()
@@ -161,6 +172,7 @@ if __name__ == "__main__":
     
     #=== init the synthetic user
     kernel = ConstantKernel(5, constant_value_bounds="fixed") * RBF(10, length_scale_bounds="fixed")
+    #kernel = ConstantKernel(5, constant_value_bounds="fixed") * RBF(10, length_scale_bounds=(5, 20))
     gp_model = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=10, alpha=2e-2)
     user = GreedyUser(gp_model, N_ARMS, interface.get_cur(), THETA_U)
 

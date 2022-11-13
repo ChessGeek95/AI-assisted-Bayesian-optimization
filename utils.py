@@ -44,6 +44,15 @@ def random_baseline(function_list, n_arms, max_iter=10):
     return np.array(z_scores)
 
 
+def create_readme(path, *args):
+    with open(path+"readme.md", "w") as f:
+        for arg in args:
+            arg_str = str(arg[0])+ ": " + str(arg[1]) + "\n"
+            f.write(arg_str)
+
+
+
+
 def plot_compare(scores_list, legends, name):
     x = np.arange(scores_list[0].shape[1])
     means = []

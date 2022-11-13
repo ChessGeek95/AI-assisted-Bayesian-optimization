@@ -215,10 +215,9 @@ def comp_ucb_scores(alpha, beta, xy_quers, z_quers):
 
 sigma = 0.001
 
-
-expr = "exp_30"
+expr = "Previous_expriments/exp_temp"
 trial_num = 2
-iters_num = 5
+iters_num = 7
 
 
 #trial_1 = Trial(PATH + "trials/"+expr+"/tiral_100_"+str(trial_num)+"_PlanningAI.pkl")
@@ -295,11 +294,11 @@ print(nll)
 
 
 nll = lambda *args: -log_likelihood(*args)
-sol = minimize(nll,[0.3,0.1],args=(data), bounds=((0,1), (0,1)))
+sol = minimize(nll,[0.3,0.3],args=(data), bounds=((0,1), (0,1)))
 #print(sol.res)
 print(sol)
 
-
+"""
 def log_prior(theta):
     alpha, beta = theta
     if 0 <= alpha <= 1 and 0 <= beta <=1:
