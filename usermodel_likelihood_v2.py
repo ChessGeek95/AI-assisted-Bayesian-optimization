@@ -248,7 +248,7 @@ def log_posterior(theta):
 
 ''' --
 
-MCMC-implementation number 1
+#MCMC-implementation number 1
 import emcee as mc
 
 #Initialize around MLE of (alpha,beta), and set 4 MC-chains
@@ -273,12 +273,12 @@ plt.savefig(PATH+'fig_6.png')
 
 ''' --
 
-MCMC-implementation number 2
+#MCMC-implementation number 2
 import zeus
 
 nwalkers = 8
-nsteps= 10
-burnin = 0
+nsteps= 4000
+burnin = 2000
 high=1
 low=0
 ndim=2
@@ -293,7 +293,7 @@ print('Mean')
 print (np.mean(chain, axis=0))
 print('Standard Deviation')
 print (np.std(chain, axis=0))
-fig, axes = zeus.cornerplot(chain[::100], size=(16,16))
+fig, axes = zeus.cornerplot(chain[:burnin:], size=(16,16), labels=[r"$\alpha$", r"$\beta$"], truth=np.array([0.5,0.5]), span=[[0,1],[0,1]])
 plt.savefig(PATH+'fig_mc_samples.png')
 
 --'''
@@ -309,13 +309,13 @@ def laplace_approx(theta, theta_map, H):
     return constant * density
 
 #theta_MAP and Hessian_MAP
-theta_initial = np.array([0.2, 0.2]) # initial guess
-solution = scipy.optimize.minimize(lambda theta: -log_posterior(theta), theta_initial, method='BFGS', options={'gtol': 1e-08})
+theta_initial = np.array([0.1, 0.1]) # initial guess
+solution = scipy.optimize.minimize(lambda theta: -log_posterior(theta), theta_initial, method='BFGS', options={'gtol': 1e-10})
 theta_map = solution.x
 print(theta_map)
 covariance_matrix = solution.hess_inv #i.e. negative of log posterior at the map-estimate
 print(covariance_matrix)
-hessian = np.linalg.inv(solution.hess_inv)
+hessian = np.linalg.pinv(solution.hess_inv) #np.linalg.inv(solution.hess_inv)
 
 #Sample from the posterior
 def sample():
