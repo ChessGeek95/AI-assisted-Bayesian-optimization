@@ -104,7 +104,7 @@ class UsermodelLikelihood:
 
     def likelihood(self,ucb_scores,sigma):
         sumPhi = self.sum_Phi_vec(0,ucb_scores,sigma)
-        likelihood = - np.sum(sumPhi)/self.m
+        likelihood = - np.sum(sumPhi)  #old: - np.sum(sumPhi)/self.m
         return likelihood
 
     ''' -- Gradient and Hessian are w.r.t. UCB scores 
@@ -312,6 +312,7 @@ def laplace_approx(theta, theta_map, H):
 theta_initial = np.array([0.2, 0.2]) # initial guess
 solution = scipy.optimize.minimize(lambda theta: -log_posterior(theta), theta_initial, method='BFGS', options={'gtol': 1e-08})
 theta_map = solution.x
+print(theta_map)
 covariance_matrix = solution.hess_inv #i.e. negative of log posterior at the map-estimate
 print(covariance_matrix)
 hessian = np.linalg.inv(solution.hess_inv)
@@ -339,8 +340,8 @@ cmap1.set_bad("k")
 A1.set_title("Densityplot of the posterior p(alpha,beta|data)")
 P = A1.pcolormesh(X,Y,xxm,cmap=cmap1)
 plt.colorbar(P,ax=A1)
-plt.plot(0.5,0.5,'*',color='black')
-plt.annotate("true (alpha,beta)", (0.5,0.5))
+plt.plot(0.5,0.5,'*',color='white')
+plt.annotate("true", (0.5,0.5),color='white')
 plt.xlabel("alpha")
 plt.ylabel("beta")
 plt.savefig(PATH+'densityplot.png')
