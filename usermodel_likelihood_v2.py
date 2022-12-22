@@ -309,11 +309,11 @@ def laplace_approx(theta, theta_map, H):
     return constant * density
 
 #theta_MAP and Hessian_MAP
-theta_initial = np.array([0.1, 0.1]) # initial guess
+theta_initial = np.array([0.1, 0.2]) # initial guess, THIS IS CRITICAL (unstable results for different initial points)
 solution = scipy.optimize.minimize(lambda theta: -log_posterior(theta), theta_initial, method='BFGS', options={'gtol': 1e-10})
 theta_map = solution.x
 print(theta_map)
-covariance_matrix = solution.hess_inv #i.e. negative of log posterior at the map-estimate
+covariance_matrix = solution.hess_inv + 1e-8 * np.eye(2) #i.e. negative of log posterior at the map-estimate + jitter diagonal
 print(covariance_matrix)
 hessian = np.linalg.pinv(solution.hess_inv) #np.linalg.inv(solution.hess_inv)
 
