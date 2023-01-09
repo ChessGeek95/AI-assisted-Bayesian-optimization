@@ -104,7 +104,7 @@ class UsermodelLikelihood:
 
     def likelihood(self,ucb_scores,sigma):
         sumPhi = self.sum_Phi_vec(0,ucb_scores,sigma)
-        likelihood = - np.sum(sumPhi)  #old: - np.sum(sumPhi)/self.m
+        likelihood = - (100/(self.m)) * np.sum(sumPhi)  #vol(y-space)/n_mcsamples  (i.e. n_arms = n_mcsamples)
         return likelihood
 
     ''' -- Gradient and Hessian are w.r.t. UCB scores 
@@ -236,12 +236,12 @@ def log_prior(theta):
     alpha, beta = theta
     if 0 <= alpha <= 1 and 0 <= beta <=1:
         return 0.0
-    return -np.inf
+    return -10**12 #-np.inf
 
 def log_posterior(theta):
     lp = log_prior(theta)
     if not np.isfinite(lp):
-        return -np.inf
+        return -10**12 #-np.inf
     return lp + log_likelihood(theta, data)
 
 
@@ -309,10 +309,24 @@ def laplace_approx(theta, theta_map, H):
     return constant * density
 
 #theta_MAP and Hessian_MAP
-theta_initial = np.array([0.1, 0.2]) # initial guess, THIS IS CRITICAL (unstable results for different initial points)
-solution = scipy.optimize.minimize(lambda theta: -log_posterior(theta), theta_initial, method='BFGS', options={'gtol': 1e-10})
-theta_map = solution.x
-print(theta_map)
+
+min_ = 10**12
+nopt = 10
+for i in range(0,nopt):
+    theta_initial = np.random.random(2)
+    solution = scipy.optimize.minimize(lambda theta: -log_posterior(theta), theta_initial, method='BFGS', options={'gtol': 1e-8,'disp' : True})
+    if solution.fun < min_:
+        min_ = solution.fun
+        theta_map = solution.x
+    print(solution.x)
+    print(theta_map)
+
+#OLD SINGLE OPT IMPLEMENTATION
+#theta_initial = np.array([0.2, 0.2]) # initial guess, THIS IS CRITICAL (unstable results for different initial points)
+#solution = scipy.optimize.minimize(lambda theta: -log_posterior(theta), theta_initial, method='BFGS', options={'gtol': 1e-8,'disp' : True})
+#theta_map = solution.x
+#print(theta_map)
+
 covariance_matrix = solution.hess_inv + 1e-8 * np.eye(2) #i.e. negative of log posterior at the map-estimate + jitter diagonal
 print(covariance_matrix)
 hessian = np.linalg.pinv(solution.hess_inv) #np.linalg.inv(solution.hess_inv)
