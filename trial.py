@@ -40,8 +40,10 @@ class Trial:
         self.user_data_z = user_data[1]    
 
     def add_belief(self, user_belief, agent_belief, user_model_beleif=None):
+        #print("before", user_belief[0].shape)
         user_belief = (user_belief[0].astype(np.float16), user_belief[1].astype(np.float16))
         agent_belief = (agent_belief[0].astype(np.float16), agent_belief[1].astype(np.float16))
+        #print("after",user_belief[0].shape)
         self.user_beliefs.append(user_belief)
         self.agent_beliefs.append(agent_belief)
     
@@ -69,15 +71,15 @@ class Trial:
                                 top=0.9, 
                                 wspace=0.4, 
                                 hspace=0.4)
-            self.plot_scatter(itr, fig, gs, row=0)
-            other.plot_scatter(itr, fig, gs, row=1)
+            self.plot_scatter(itr+1, fig, gs, row=0)
+            other.plot_scatter(itr+1, fig, gs, row=1)
             pdf.savefig(fig, papertype = 'a4', orientation = 'landscape')
             plt.close()
         pdf.close()
 
     def plot(self, path=None):
         pdf = PdfPages(PATH+'results/multipage_pdf.pdf')
-        for itr in range(2):#self.n_iters):
+        for itr in range(1,3):#self.n_iters):
             fig = plt.figure(figsize=(22,16))
             gs = fig.add_gridspec(20,3)
             #fig.tight_layout()
@@ -124,10 +126,11 @@ class Trial:
                 
 
         matplotlib.rcParams.update({'font.size': 16})
-        ax_1 = utils.plot_vec(fig, gs[7:15, 0], cur, itr, vec_u_1, 0, 0, 1, user_color)
+        #ax_1 = utils.plot_vec(fig, gs[7:15, 0], cur, itr, vec_u_1, 0, 0, 1, user_color)
         plt.title("User", fontsize=18, weight='bold')
-        utils.plot_scatter(fig, gs, cur, self, itr, x, y, mu_u, 0, 1, user_color)
-        utils.plot_vec(fig, gs, cur, itr, vec_u_2, 0, 1, 0, user_color)
+        self.plot_scatter(itr, fig, gs, row=1, arrow_color=user_color)
+        #utils.plot_scatter(fig, gs, cur, self, itr, x, y, mu_u, 0, 1, user_color)
+        #ax_1 = utils.plot_vec(fig, gs, cur, itr, vec_u_2, 0, 1, 0, user_color)
         
         utils.plot_vec(fig, gs, cur, itr, vec_1, 1, 0, 1, interface_color)
         #plt.hlines(0, 0, n_arms[0], linestyles ="solid", colors ="#666666",linewidth=2, alpha=0.3)
@@ -142,6 +145,8 @@ class Trial:
         utils.plot_scatter(fig, gs, cur, self, itr, x, y, mu_a, 2, 0, agent_color)
         utils.plot_vec(fig, gs, cur, itr, vec_a_2, 2, 1, 0, agent_color)
         
+        """
+        
         p1 = ax_1.get_position().get_points().flatten()
         #print(p1)
         p3 = ax_2.get_position().get_points().flatten()
@@ -152,7 +157,7 @@ class Trial:
         cbar.set_ticks([])
         fig.text(p1[0]+0.005, p1[3]+0.107, 'Min', fontsize=18, weight='bold')
         fig.text(p3[2]-p1[0]+0.067, p1[3]+0.107, 'Max',color='white', fontsize=18, weight='bold')
-
+        """
 
         utils.subplot_border(fig, gs[2:6, :], itr, border_color_1)
         
@@ -167,12 +172,28 @@ class Trial:
         fig.text(p[0]-0.05, p[3]-0.18, "User's Turn => iter "+str(itr+1), fontsize=18, weight='bold', rotation='vertical', color=border_color_2)
 
     
-    def plot_scatter(self, itr, fig, gs, row):
+    """
+    def plot_vec(self, fig, gs, cur, itr, vec, pos, row, who, color):
+        ax = fig.add_subplot(gs)
+        plt.plot(vec, '.', color=color, alpha=0.8)
+        if itr > 0:
+            plt.vlines(cur[who], np.min(vec), vec[cur[who]],
+                    linestyles ="solid", colors ="k",linewidth=4, alpha=0.3)
+            plt.plot(cur[who], vec[cur[who]], 'X', color='k', markersize=8, alpha=0.5)
+        #plt.ylim([-1.05,1.05])
+        plt.ylabel(" ")
+        #customize_axis(ax)
+        return ax
+    """
+
+    
+    def plot_scatter(self, itr, fig, gs, row, arrow_color=None):
         if itr == -1:
             itr = self.n_iters-1
         x_arms, y_arms = self.n_arms
         x = np.tile(np.arange(x_arms), y_arms)
         y = np.repeat(np.arange(y_arms), x_arms)
+        #mu_u = self.user_beliefs[itr][0]
         mu_u = self.user_beliefs[itr][0]
         mu_a = self.agent_beliefs[itr][0]
         mu = self.function_df
@@ -183,22 +204,22 @@ class Trial:
         #print(mu.shape)
         
         #======== colors ===========
-        user_color = "#cc0099"
+        user_color = "#c018b7" #"#cc0099"
         interface_color = "#248f24"
-        agent_color = "#0066cc"
+        agent_color = "#18c021" #"#0066cc"
         
         #===========================
-        
         matplotlib.rcParams.update({'font.size': 16})
         ax_1 = utils.plot_scatter(fig, gs[row*9+2:row*9+10, 0], cur, self, itr, x, y, mu_u, 0, 1, user_color)
         plt.title("User", fontsize=18, weight='bold')
         
-        utils.plot_scatter(fig, gs[row*9+2:row*9+10, 1], cur, self, itr, x, y, mu, 1, -1, interface_color)
+        utils.plot_scatter(fig, gs[row*9+2:row*9+10, 1], cur, self, itr, x, y, mu, 1, -1, interface_color, arrow_color)
         plt.title("Interface", fontsize=18, weight='bold')
         plt.ylabel("User's action space", fontsize=20, weight='bold')
         plt.xlabel("Agent's action space", fontsize=20, weight='bold')
         
         ax_2 = utils.plot_scatter(fig, gs[row*9+2:row*9+10, 2], cur, self, itr, x, y, mu_a, 2, 0, agent_color)
+        #ax_2.set_facecolor('xkcd:salmon')
         plt.title("Agent", fontsize=18, weight='bold')
 
         #utils.subplot_border(fig, gs[row*9+2:row*9+10, :], itr, interface_color)

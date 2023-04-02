@@ -1,5 +1,4 @@
 import numpy as np
-from wandb import agent
 
 class Interface:
     """
@@ -22,10 +21,12 @@ class Interface:
         """
         points: a tuple or a numpy array of shape (N, 2)
         """
+        if points is None or len(points) == 0:
+            return None
         if type(points) == tuple:
             return self.function[points[1], points[0]]
             #return self.function[points[0], points[1]]
-        else: 
+        else:
             return self.function[points[:,1], points[:,0]]
             #return self.function[points[:,0], points[:,1]]
 
@@ -33,10 +34,16 @@ class Interface:
         return self.cur
 
     def init_user(self):
-        return self.user_data, self._query(self.user_data)
+        z = self._query(self.user_data)
+        if z is None:
+            z = []
+        return self.user_data, z
 
     def init_agent(self):
-        return self.agent_data, self._query(self.agent_data)
+        z = self._query(self.agent_data)
+        if z is None:
+            z = []
+        return self.agent_data, z
 
     def step(self, x_t, y_t):
         """

@@ -188,9 +188,9 @@ def comp_ucb_scores(alpha, beta, xy_quers, z_quers, xy_p, z_p):
 
 sigma = 0.001
 
-expr = "exp_temp"
+expr = "exp_1"
 trial_num = 0
-iters_num = 7
+iters_num = 10
 
 
 #trial_1 = Trial(PATH + "trials/"+expr+"/tiral_100_"+str(trial_num)+"_PlanningAI.pkl")
@@ -313,7 +313,7 @@ theta_initial = np.array([0.2, 0.2]) # initial guess
 solution = scipy.optimize.minimize(lambda theta: -log_posterior(theta), theta_initial, method='BFGS', options={'gtol': 1e-08})
 theta_map = solution.x
 print(theta_map)
-covariance_matrix = solution.hess_inv #i.e. negative of log posterior at the map-estimate
+covariance_matrix = solution.hess_inv + 1e-8 * np.eye(2)#i.e. negative of log posterior at the map-estimate
 print(covariance_matrix)
 hessian = np.linalg.inv(solution.hess_inv)
 

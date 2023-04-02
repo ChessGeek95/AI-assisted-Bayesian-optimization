@@ -1,0 +1,29 @@
+Settign up the virtual env on triton:
+
+# for interactive jobs
+srun -p interactive --time=5:00:00 --mem=6GB --pty bash
+
+
+module load miniconda
+
+
+# if needed
+conda update conda 
+
+# first time creating the virtual env
+conda create -n CoopBO python=3.9 anaconda
+
+# activating the virtual env
+conda activate CoopBO
+
+# checking a package version
+conda list -n CoopBO -c package_name
+
+# for deactivating a virtual env
+conda deactivate
+
+
+
+# installing required packages
+conda install -n CoopBO scikit-learn=0.24.2
+conda install -c conda-forge gym

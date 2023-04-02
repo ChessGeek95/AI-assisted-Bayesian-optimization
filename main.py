@@ -2,8 +2,7 @@ import pathlib
 import numpy as np
 import matplotlib
 import os
-
-from sklearn import utils
+import argparse, sys
 
 from experiment_settings import ExperimentSettings
 from trial import Trial
@@ -16,116 +15,88 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel
 from copy import deepcopy
 import datetime
+from joblib import Parallel, delayed
+import time
 
 from interface import Interface
 from users.simulated_user import GreedyUser
-from agents.agents import EpsGreedyAgent, StrategicAgent
+from agents.agents import BaseAgent, EpsGreedyAgent, StrategicAgent
 
-from utils import PATH, create_readme
+from utils import PATH, RANDOM_SEED, create_readme
 import warnings
 from sklearn.exceptions import ConvergenceWarning
 
-np.warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning)
+#np.warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning)
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
 
+sys.path.append(PATH)
 
 
+def simulate(interface, user, agent, experiment_settings, trials_range, n_iters, expr, known_user=False, name=None, n_jobs=1):
+    np.random.seed(RANDOM_SEED)
+    start = time.time()
+    if n_jobs > 1:
+        Parallel(n_jobs=n_jobs)(delayed(simulate_trial)(episode, interface, user, agent,
+                                         experiment_settings, n_iters, expr, name, known_user) for episode in range(*trials_range))
+    else:
+        for episode in range(*trials_range):
+            simulate_trial(episode, interface, user, agent, experiment_settings, n_iters, expr, name, known_user)
+    end = time.time()
+    #====================================================================
+    with open(EXP_PATH+"run.log", "a") as f:
+        f.write(expr + "  trial_rng:" + str(trl_range) +
+                "  user_pars:" + str((user.alpha, user.beta))+ " user_idx:"+ str(user_idx)+
+                "   agent:" + name + "  time:" + '{:.1f} s'.format(end-start) + "\n")
+    return 0
 
-def simulate(interface, user, agent, experiment_settings, n_trials=5, n_iters=10, name=None):
-    scores = np.zeros((n_trials, n_iters))
-    test_regions = [[],[],[],[]]
-    for episode in range(n_trials):
-        trial = Trial()
-        trial.set_values(user, agent, interface, experiment_settings, n_iters, episode)
-        func_arg = experiment_settings.function_args[episode]
-        start_point = experiment_settings.starting_points[episode]
-        #print("#"*50, func_arg, "#"*5, start_point)
-        user_data, agent_data = interface.reset(expr_settings.function_list[episode],
-                                                expr_settings.user_data_list[episode],
-                                                expr_settings.agent_data_list[episode],
-                                                start_point)
-        user.reset(user_data)
-        agent.reset(agent_data, user_data)
-        
-        trial.add_prior_data(agent_data, user_data)
-        trial.add_belief(user.current_prediction(cur=False, return_std=False), 
-                        agent.current_prediction(cur=False, return_std=False))
-        
 
-        #print("settings ### m:", m, " start:", start_point)
-        """
-        if episode == 1000:
-            pdf = PdfPages(PATH+'results/multipage_pdf.pdf')
-        """
-            
-
-        for t in range(n_iters):
-
-            #print(interface.cur, end=' ==> ')
-            
-            x_t = agent.take_action()
-            #observation = interface.step(x_t, 0)
-            #user.update(observation, x_t)
-            #agent.update(observation)
-
-            """ if episode == 0:
-                
-                gs = fig.add_gridspec(13,3)
-                plot_interaction(user, agent, interface, 0, 0, fig, gs, t)
-             """
-            #print(interface.cur, end=' -> ')
-
-            y_t = user.take_action(agent_action=x_t)
-            observation = interface.step(x_t, y_t)
-            agent.update(observation, y_t)
-            user.update(observation)
-
-            score = interface.get_score()
-            scores[episode, t] = score[1]
-
-            """
-            if episode == 1000:
-                fig = plt.figure(figsize=(25, 21))
-                gs = fig.add_gridspec(13,3)
-                plot_interaction(user, agent, interface, 1, 1, fig, gs, t)
-                #fig.tight_layout()
-                plt.subplots_adjust(left=0.1,
-                                bottom=0.1, 
-                                right=0.9, 
-                                top=0.9, 
-                                wspace=0.4, 
-                                hspace=0.4)
-                pdf.savefig(fig)
-                plt.close()
-            """
-            user_belief = user.current_prediction(cur=False)
-            agent_belief = agent.current_prediction(cur=False)
-            trial.add_belief(user_belief, agent_belief)
-
-            #print(t,' ', interface.cur, ' ->\t',np.round(interface.z_queries[-1],3),'\t', score[1])
-
-        """
-        if episode == 1000:
-            #fig.colorbar()
-            pass
-            pdf.close()
-        """
-        test_regions[np.argmax(func_arg)].append(score[1])
-        print('$', episode+1, '=>', score[1], ' ==> ', np.argmax(func_arg),' ## ', np.round(func_arg,1))
-        trial.add_queries(interface.xy_queries, interface.z_queries, scores[episode])
-        trial.save(path=EXP_PATH+"tiral_"+str(experiment_settings.id)+"_"
-                                            +str(episode)+"_"
-                                            +name
-                                            +".pkl")
+def simulate_trial(episode, interface, user, agent, experiment_settings, n_iters, expr, name, known_user):
+    trial_path = EXP_PATH+expr+"/tiral_"+str(experiment_settings.id)+"_"+str(episode)+"_"+name+".pkl"
+    """
+    if os.path.exists(EXP_PATH):
+        print("*"*30)
+        print(trial_path)
+        print("*"*30)
+        return
+    """
     
-    print('-'*25)
-    print("Mean:", np.round(np.mean(scores[:,-1]),2))
-    print("Regions:", np.round([np.mean(test_regions[v]) for v in range(4)],2))
-    #print("#"*50, '\n')
-    # evaluate
-    return scores
+    trial = Trial()
+    trial.set_values(user, agent, interface, experiment_settings, n_iters, episode)
+    #func_arg = experiment_settings.function_args[episode]
+    start_point = experiment_settings.starting_points[episode]
 
+    user_data, agent_data = interface.reset(expr_settings.function_list[episode],
+                                            expr_settings.user_data_list[episode],
+                                            expr_settings.agent_data_list[episode],
+                                            start_point)
+    user.reset(user_data)
+    if known_user:
+        agent.reset(agent_data, user_data) # uses perfect user knowledge, estimates params
+    else:
+        agent.reset(agent_data)
+    
+    trial.add_prior_data(agent_data, user_data)
+    #trial.add_belief(user.current_prediction(cur=False), 
+    #                agent.current_prediction(cur=False))
+        
+    trl_scores = np.zeros((n_iters,))
+    for t in range(n_iters):
+        x_t = agent.take_action()
+        y_t = user.take_action(agent_action=x_t)
+        observation = interface.step(x_t, y_t)
+        agent.update(observation, y_t)
+        user.update(observation)
+
+        score = interface.get_score()
+        trl_scores[t] = score[1]
+
+        user_belief = user.current_prediction(cur=False)
+        agent_belief = agent.current_prediction(cur=False)
+        #trial.add_belief(user_belief, agent_belief)
+
+    trial.add_queries(interface.xy_queries, interface.z_queries, trl_scores)
+    trial.save(path=trial_path)
 
 
 
@@ -134,66 +105,142 @@ def simulate(interface, user, agent, experiment_settings, n_trials=5, n_iters=10
 
 if __name__ == "__main__":
 
-    #=== init params
-    N_TRIALS = 1
-    N_ITERS = 5
-    THETA_U = (.5, 0.5)
-    N_ARMS = (100, 100)
-    GENERATE_NEW_EXP = True
-    EXP_PATH = PATH+"trials/exp_temp/"
+
+    #====================================================================
     
+    parser=argparse.ArgumentParser()
+
+    parser.add_argument("-s", "--seed", help="Which seed?")
+    parser.add_argument("-j", "--n_jobs", help="How many CPUs?")
+    parser.add_argument("-nt", "--n_trials", help="How many trials?")
+    parser.add_argument("-ni", "--n_iters", help="How many iterations?")
+    parser.add_argument("-na", "--n_arms", nargs="+",  help="Space dimension?")
+    parser.add_argument("-eid", "--expr_id", help="which experiment?")
+    parser.add_argument("-u", "--user_idx", help="which user?")
+    parser.add_argument("-rng", "--trl_range", nargs="+", help="int or tuple, which trials?")
+    
+    args=parser.parse_args()
+
+    
+    RANDOM_SEED  = eval(args.seed)
+    N_JOBS = eval(args.n_jobs)
+    N_TRIALS = eval(args.n_trials)
+    N_ITERS = eval(args.n_iters)
+    N_ARMS = [eval(r) if isinstance(r, str) else r for r in args.n_arms]
+    
+    EXPERIMENT_ID = eval(args.expr_id)
+    user_idx = eval(args.user_idx)
+    trl_range = [eval(r) if isinstance(r, str) else r for r in args.trl_range]
+
+
+    if len(trl_range)==1:
+        trl_range = [trl_range[0], trl_range[0]+1]
+    else:
+        trl_range[1] += 1
+    if trl_range[1] > N_TRIALS:
+        trl_range[1] = N_TRIALS
+    
+    #====================================================================
+    
+    #=== init params
+    
+    ALPHA_SET = [0.1, 0.6]
+    BETA_SET = [0.2, 0.7]
+    BETA_UCB = 0.05
+    THETA_USER_SET = [(a, b) for a in ALPHA_SET for b in BETA_SET]
+    N_ARMS = (50, 50)
+    GENERATE_NEW_EXP = False
+    EXP_PATH = PATH+"trials/expriment_"+str(EXPERIMENT_ID)+"/"
+
+    experiment_sets = ["EXP_"+str(v) for v in range(len(THETA_USER_SET))]
+
+    np.random.seed(RANDOM_SEED)
+    #====================================================================
     
     if not os.path.exists(EXP_PATH):
         os.makedirs(EXP_PATH)
-
-    create_readme(EXP_PATH, ["N_TRIALS", N_TRIALS],
-                            ["N_ITERS", N_ITERS],
-                            ["THETA_U", THETA_U],
-                            ["N_ARMS", N_ARMS])
+        os.makedirs(EXP_PATH + "problems/")
+        os.makedirs(EXP_PATH + "results/")
+        for ex in experiment_sets:
+            os.makedirs(EXP_PATH + ex + "/")
     
-
+    #====================================================================
     expr_settings = ExperimentSettings()
-    if GENERATE_NEW_EXP:
-        expr_settings.set_values(N_ARMS, N_TRIALS, id=100)
-        
-        if not os.path.exists(EXP_PATH + 'exp_settings'):
-            os.makedirs(EXP_PATH + 'exp_settings')
-        expr_settings.save(path=EXP_PATH+"exp_settings/exp_setting.pkl")
+    if (not os.listdir(EXP_PATH+"problems/")) or GENERATE_NEW_EXP:
+        print("generating new set of problems...")
+        expr_settings.set_values(N_ARMS, N_TRIALS, id=EXPERIMENT_ID)
+        expr_settings.save(path=EXP_PATH+"problems/problems.pkl")
     else:
-        expr_settings.load(path=EXP_PATH+"exp_settings/exp_setting.pkl")
-    #-----------------------
+        expr_settings.load(path=EXP_PATH+"problems/problems.pkl")
+
+
+    #====================================================================
+    exp_info = [(experiment_sets[i], THETA_USER_SET[i]) for i in range(len(experiment_sets))]
+    create_readme(EXP_PATH, ["RANDOM_SEED", RANDOM_SEED],
+                            ["N_TRIALS",    N_TRIALS],
+                            ["N_ITERS",     N_ITERS],
+                            ["ALPHA_SET",   ALPHA_SET],
+                            ["BETA_SET",    BETA_SET],
+                            ["BETA_UCB",    BETA_UCB],
+                            ["THETA_U",     THETA_USER_SET],
+                            ["N_ARMS",      N_ARMS],
+                            *exp_info)
+    #====================================================================
     
+    #"""
     #=== init the environment
     interface = Interface(N_ARMS)
-    #interface.reset()
-   #print(np.round(interface.function, 2))
-    #print("-"*50)
-    #print(interface.all_points[:5])
     
     #=== init the synthetic user
     kernel = ConstantKernel(5, constant_value_bounds="fixed") * RBF(10, length_scale_bounds="fixed")
     #kernel = ConstantKernel(5, constant_value_bounds="fixed") * RBF(10, length_scale_bounds=(5, 20))
-    gp_model = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=10, alpha=2e-2)
-    user = GreedyUser(gp_model, N_ARMS, interface.get_cur(), THETA_U)
+    #gp_model = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=10, alpha=2e-2)
+    users = []
+    for user_params in THETA_USER_SET:
+        gp_model = GaussianProcessRegressor(kernel=deepcopy(kernel), n_restarts_optimizer=10, alpha=2e-2)
+        user = GreedyUser(gp_model, N_ARMS, interface.get_cur(), user_params)
+        users.append(user)
 
-    #=== init the AI agent
-    kernel, gp_model = deepcopy(kernel), deepcopy(gp_model)
-    greedy_agent = EpsGreedyAgent(gp_model, N_ARMS, interface.get_cur())
-    strategic_agent = StrategicAgent(gp_model, N_ARMS, interface.get_cur())
+    #=== init the AI agents
+    gp_model_random = GaussianProcessRegressor(kernel=deepcopy(kernel), n_restarts_optimizer=10, alpha=2e-2)
+    random_agent = BaseAgent(gp_model_random, N_ARMS, interface.get_cur(), max_iters=N_ITERS)
     
+    gp_model_greedy = GaussianProcessRegressor(kernel=deepcopy(kernel), n_restarts_optimizer=10, alpha=2e-2)
+    greedy_agent = EpsGreedyAgent(gp_model_greedy, N_ARMS, interface.get_cur(), beta=BETA_UCB, max_iters=N_ITERS)
+
+    #the planning agent with known user knowledge
+    gp_model_omni_stratgic = GaussianProcessRegressor(kernel=deepcopy(kernel), n_restarts_optimizer=10, alpha=2e-2)
+    omni_strategic_agent = StrategicAgent(gp_model_omni_stratgic, N_ARMS, interface.get_cur(), max_iters=N_ITERS)
+    
+    gp_model_stratgic = GaussianProcessRegressor(kernel=deepcopy(kernel), n_restarts_optimizer=10, alpha=2e-2)
+    strategic_agent = StrategicAgent(gp_model_stratgic, N_ARMS, interface.get_cur(), max_iters=N_ITERS)
+
+    gp_model_omni_stratgic_2 = GaussianProcessRegressor(kernel=deepcopy(kernel), n_restarts_optimizer=10, alpha=2e-2)
+    omni_strategic_agent_2 = StrategicAgent(gp_model_omni_stratgic_2, N_ARMS, interface.get_cur(), max_iters=N_ITERS, user_params=THETA_USER_SET[user_idx])
+    #====================================================================
     #=== run the experiment
-    np.random.seed(987654321)
-    scores_baseline = simulate(interface, user, greedy_agent, expr_settings, N_TRIALS, N_ITERS, name="GreedyAI")
-    #scores_my_method = simulate(interface, user, strategic_agent, expr_settings, N_TRIALS, N_ITERS, name="PlanningAI")
     #"""
-    #np.save(PATH + 'results/base.npy', scores_baseline)
-    #np.save(PATH + 'results/mine.npy', scores_my_method)
+    
+    #"""
+    
+    simulate(interface, users[user_idx], random_agent, expr_settings, trl_range, N_ITERS,
+                expr=str(experiment_sets[user_idx]), known_user=False, name="RandomAI")
 
-    print('#'*80)
-    #print(scores_baseline)
-    print('='*80)
-    #print(scores_my_method)
-    print('#'*80)
+    
+    
+    simulate(interface, users[user_idx], greedy_agent, expr_settings, trl_range, N_ITERS,
+                expr=str(experiment_sets[user_idx]), known_user=False, name="GreedyAI_2")
 
-    #plot_compare(scores_baseline, scores_my_method, ["baseline", "our method"])
-    #"""S
+    #"""
+
+    simulate(interface, users[user_idx], strategic_agent, expr_settings, trl_range, N_ITERS, 
+                expr=str(experiment_sets[user_idx]), known_user=False, name="PlanningAI", n_jobs=N_JOBS)
+    
+    """
+    simulate(interface, users[user_idx], omni_strategic_agent, expr_settings, trl_range, N_ITERS, 
+                expr=str(experiment_sets[user_idx]), known_user=True, name="OmniPlanningAI", n_jobs=N_JOBS)
+    
+    simulate(interface, users[user_idx], omni_strategic_agent_2, expr_settings, trl_range, N_ITERS, 
+                expr=str(experiment_sets[user_idx]), known_user=True, name="OmniPlanningAI_2", n_jobs=N_JOBS)
+
+    #"""

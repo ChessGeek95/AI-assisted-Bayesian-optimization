@@ -10,9 +10,12 @@ class StateNode:
     """
 
 
-    def __init__(self, state=None, parent=None, is_root=False, is_final=False):
+    def __init__(self, state=None, parent=None, is_root=False, is_final=False, reward=None):
         self.n_visits = 0
         self.reward = 0
+        if reward:
+            self.reward = reward
+            #self.n_visit = 1
         self.state = state
         self.parent = parent
         self.is_final = is_final

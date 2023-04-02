@@ -21,6 +21,7 @@ class GreedyUser:
     def __init__(self, init_gp, n_arms, cur, theta_u):
         self.alpha = theta_u[0] # belief updating param
         self.beta = theta_u[1] # UBC search param
+        self.init_gp = cpy(init_gp)
         self.gp = cpy(init_gp)
         self.x_arms, self.y_arms = n_arms
         x, y = np.meshgrid(np.arange(self.x_arms), np.arange(self.y_arms))
@@ -36,7 +37,8 @@ class GreedyUser:
         """
         xy = np.append(self.xy_p, self.xy_queries).reshape(-1,2)
         z = np.append(self.z_p, self.z_queries)
-        self.gp.fit(xy, z)
+        if xy.size > 0:
+            self.gp.fit(xy, z)
 
     
     def take_action(self, agent_action, eps=0):
@@ -101,6 +103,7 @@ class GreedyUser:
 
     
     def reset(self, data):
+        self.gp = cpy(self.init_gp)
         self.xy_queries = []
         self.z_queries = []
         self.xy_p, self.z_p = data

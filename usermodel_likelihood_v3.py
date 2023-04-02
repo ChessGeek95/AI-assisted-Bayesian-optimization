@@ -13,6 +13,8 @@ import matplotlib.cm as cm
 from scipy.optimize import minimize
 
 
+from trial import Trial
+from utils import PATH
 
 import warnings
 warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning) 
@@ -26,23 +28,26 @@ def var2_normal_pdf(x):
 
 
 
+
 class UsermodelLikelihood:
+
     ''' Code snippets from https://github.com/AaltoPML/PPBO'''
 
-    def __init__(self, m):
+    def __init__(self,m):
         self.m = m #number of actions the user can take minus one action
+        #self.N = None #number user feedbacks times hypothetical actions, i.e. length of score vector
         self.n_gausshermite_sample_points = 40
 
-    def is_pseudobs(self, i):
+    def is_pseudobs(self,i):
         if i==0:
             return True
         else:
             return i % (self.m+1) == 0
 
-    def update_indices_bookeeping(self, N):
+    def update_indices_bookeeping(self,N):
         self.N = N
-        self.obs_indices = [i for i in range(0, N) if self.is_pseudobs(i)]
-        self.pseudobs_indices = [i for i in range(0, N) if not self.is_pseudobs(i)]
+        self.obs_indices = [i for i in range(0,N) if self.is_pseudobs(i)]
+        self.pseudobs_indices = [i for i in range(0,N) if not self.is_pseudobs(i)]
         self.latest_obs_indices =sum([[i,]*(self.m) for i in self.obs_indices],[])
 
 
@@ -99,27 +104,22 @@ class UsermodelLikelihood:
 
     def likelihood(self,ucb_scores,sigma):
         sumPhi = self.sum_Phi_vec(0,ucb_scores,sigma)
-        #likelihood = - (50/(self.m)) * np.sum(sumPhi)  #vol(y-space)/n_mcsamples  (i.e. n_arms = n_mcsamples)
-        #likelihood = -np.sum(sumPhi)
-        likelihood = - (100/(self.m)) * np.sum(sumPhi)
+        likelihood = - np.sum(sumPhi)  #old: - np.sum(sumPhi)/self.m
         return likelihood
 
     
 
 ''' Example how this class can be used '''
 
-def comp_ucb_scores(alpha, beta, xy_quers, z_quers, xy_p, z_p, y_arms):
+def comp_ucb_scores(alpha, beta, xy_quers, z_quers, xy_p, z_p):
     xy = np.array(xy_quers)
-    #print("xy_shape:", xy.shape)
     agent_actions = xy[:,0]
     user_actions = xy[:,1]
     x = np.repeat(agent_actions, y_arms).reshape(-1, y_arms)
     y = np.array([[u]+[v for v in range(y_arms) if v!=u] for u in user_actions])
     kernel = ConstantKernel(5, constant_value_bounds="fixed") * RBF(10, length_scale_bounds="fixed")
     gp_model = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=10, alpha=2e-2)
-    #gp_model.fit(user_xy, user_z)
-    if len(xy_p)>0:
-        gp_model.fit(xy_p, z_p)
+    gp_model.fit(user_xy, user_z)
     xy_quers = np.array(xy_quers)
     n_iters = xy_quers.shape[0]
     z_qs = []
@@ -137,84 +137,126 @@ def comp_ucb_scores(alpha, beta, xy_quers, z_quers, xy_p, z_p, y_arms):
     return ucb_scores
 
 
-def log_likelihood(theta, data, y_arms):
-    sigma = 0.001
-    alpha, beta = theta
-    xy_q, z_q, user_xy, user_z = data[0]
-    ucb_scores = comp_ucb_scores(alpha, beta, xy_q, z_q, user_xy, user_z, y_arms)
-    likclass = UsermodelLikelihood(y_arms-1)
-    likclass.update_indices_bookeeping(len(ucb_scores))
-    ll = likclass.likelihood(ucb_scores, sigma)
-    return ll
-
-def log_prior(theta):
-    alpha, beta = theta
-    if 0 <= alpha <= 1 and 0 <= beta <=1:
-        return 0.0
-    return -10**12#np.inf
-
-def log_posterior(theta, data, y_arms):
-    lp = log_prior(theta)
-    if not np.isfinite(lp):
-        return -10**12#np.inf
-    return lp + log_likelihood(theta, data, y_arms)
-
-
-def draw_posterior_samples(n_samples, data, y_arms):
-    """
-    theta_initial = np.array([0.1, 0.1]) # initial guess
-    solution = scipy.optimize.minimize(lambda theta: -log_posterior(theta, data, y_arms), theta_initial, method='BFGS', options={'gtol': 1e-08})
-    theta_map = solution.x
-    """
-    min_ = 10**12
-    nopt = 10
-    for i in range(nopt):
-        theta_initial = np.random.random(2)
-        solution = scipy.optimize.minimize(lambda theta: -log_posterior(theta, data, y_arms), theta_initial, method='BFGS', options={'gtol': 1e-08})
-        if solution.fun < min_:
-            min_ = solution.fun
-            theta_map = solution.x
-    #print(theta_map)
-    covariance_matrix = solution.hess_inv + 1e-8 * np.eye(2) #i.e. negative of log posterior at the map-estimate
-    samples = np.random.multivariate_normal(theta_map, covariance_matrix, size=n_samples , check_valid='warn')
-    alpha_samples = samples[:,0]
-    beta_samples = samples[:,1]
-    return alpha_samples, beta_samples
 
 
 
 #===========================================================
 
+sigma = 0.001
 
-"""
-expr = "exp_temp"
+expr = "exp_1"
 trial_num = 0
 iters_num = 7
-n_samples = 2000
 
 
-trial_1 = Trial(PATH + "trials/"+expr+"/tiral_100_"+str(trial_num)+"_PlanningAI.pkl")
-#trial_1 = Trial(PATH + "trials/"+expr+"/tiral_100_"+str(trial_num)+"_GreedyAI.pkl")
+#trial_1 = Trial(PATH + "trials/"+expr+"/tiral_100_"+str(trial_num)+"_PlanningAI.pkl")
+trial_1 = Trial(PATH + "trials/"+expr+"/tiral_100_"+str(trial_num)+"_GreedyAI.pkl")
 #print(trial_1.n_arms)
 #print(trial_1.n_iters)
 
+n_part = 4
+params = [[(i/(10),j/(10)) for i in range(1, n_part+1)] for j in range(1, n_part+1)]
 
 x_arms, y_arms = trial_1.n_arms
+#alpha, beta = trial_1.user_params
 print("True params: ",trial_1.user_params)
-
+#alpha, beta = (0.1, 0.8)
 xy_queries = trial_1.xy_queries[:iters_num]
 z_queries = trial_1.z_queries[:iters_num]
 user_xy = trial_1.user_data
 user_z = trial_1.user_data_z
+#print("num init points: ", len(user_xy))
+
+
+
+def log_likelihood(theta,data):
+    alpha, beta = theta
+    xy_q, z_q, user_xy, user_z = data[0]
+    ucb_scores = comp_ucb_scores(alpha, beta, xy_q, z_q, user_xy, user_z)
+    likclass = UsermodelLikelihood(y_arms-1)
+    likclass.update_indices_bookeeping(len(ucb_scores))
+    ll = likclass.likelihood(ucb_scores, sigma)
+    return ll
+
+
 data = [(xy_queries, z_queries, user_xy, user_z)]
-
-
-
-
-samples = draw_posterior_samples(n_samples, data, y_arms)
-
-print(samples.shape)
-print(np.mean(samples, axis=0))
-print(np.std(samples, axis=0))
-
 """
+#ML-estimate
+theta = (0.2, 0.2)
+nll = lambda *args: -log_likelihood(*args)
+sol = minimize(nll,[0.3,0.3],args=(data), bounds=((0,1), (0,1)))
+#print(sol)
+"""
+
+
+def log_prior(theta):
+    alpha, beta = theta
+    if 0 <= alpha <= 1 and 0 <= beta <=1:
+        return 0.0
+    return -np.inf
+
+def log_posterior(theta):
+    lp = log_prior(theta)
+    if not np.isfinite(lp):
+        return -np.inf
+    return lp + log_likelihood(theta, data)
+
+
+
+
+
+
+''' --- Laplace Approximation (preferred posterior inference method) --- '''
+
+def laplace_approx(theta, theta_map, H):
+    detH =  np.linalg.det(H)
+    constant = np.sqrt(detH)/(2*np.pi)**(2.0/2.0)
+    density = np.exp(-0.5 * (theta-theta_map).dot(H).dot(theta-theta_map))
+    return constant * density
+
+#theta_MAP and Hessian_MAP
+theta_initial = np.array([0.3, 0.3]) # initial guess
+solution = scipy.optimize.minimize(lambda theta: -log_posterior(theta), theta_initial, method='BFGS', options={'gtol': 1e-08})
+theta_map = solution.x
+covariance_matrix = solution.hess_inv #i.e. negative of log posterior at the map-estimate
+#print("Cov:", covariance_matrix)
+hessian = np.linalg.inv(solution.hess_inv)
+
+#Sample from the posterior
+def sample():
+    draw = np.array([-1, -1])
+    while np.any(draw < 0) or np.any(draw > 1):
+        draw = np.random.multivariate_normal(theta_map, covariance_matrix, check_valid='warn')
+    return draw
+
+#"""
+print("="*5, " samples ", "="*5)
+samples = []
+for i in range(2000):
+    s = sample()
+    samples.append(s)
+    if i < 10:
+        print(np.round(s, 3))
+
+print("mean:", np.round(np.mean(samples, axis=0), 3))
+print("std: ", np.round(np.std(samples, axis=0), 3))
+#"""
+
+
+#Plot the joint density
+side = np.linspace(0,1,400)
+X,Y = np.meshgrid(side,side)
+Z = np.vectorize(lambda alpha,beta: laplace_approx([alpha,beta], theta_map, hessian))(X,Y)
+plt.figure()
+F, A1 = plt.subplots(ncols=1,figsize=(15,5))
+xxm = np.ma.masked_less(Z,0.01)
+cmap1 = cm.get_cmap("jet",lut=10)
+cmap1.set_bad("k")
+A1.set_title("Densityplot of the posterior p(alpha,beta|data)")
+P = A1.pcolormesh(X,Y,xxm,cmap=cmap1)
+plt.colorbar(P,ax=A1)
+plt.plot(0.5,0.5,'*',color='black')
+plt.annotate("true (alpha,beta)", (0.5,0.5))
+plt.xlabel("alpha")
+plt.ylabel("beta")
+plt.savefig(PATH+'densityplot.png')

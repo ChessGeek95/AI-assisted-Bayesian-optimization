@@ -27,29 +27,73 @@ class CorDesc2dEnv(gym.Env):
         self.z_queries = []
 
     
-    def step(self, action_ai):
+    def step(self, action_ai, y_dist=None):
         """
         Update the enviroment upon agent's action
         action_ai: int
             choosen arm by the agent
         """
-        self.opt_game.agent_action(action_ai)
-        action_u = self.user_model.take_action(action_ai)
-        self.opt_game.user_action(action_u)
+        ucb_scores_x = self.opt_game.agent_action(action_ai)
+        #***************************************************************************
+        topk_idx = np.argpartition(ucb_scores_x, -self.opt_game.y_arms//5)[-self.opt_game.y_arms//5:]
+        avg_topk_ucb = np.mean(ucb_scores_x[topk_idx])
+        avg_ucb_user = 0
+        #f = open("out.text", "a")
+        if y_dist is not None:
+            """
+            f.writelines("y_dist shape:" + str(y_dist.shape))
+            f.writelines("ucb_scores_x shape:"+str(ucb_scores_x.shape))
+            f.writelines("ucb shape:"+str((y_dist * ucb_scores_x).shape))
+            f.close()
+            """
+            avg_ucb_user = np.mean(y_dist * ucb_scores_x)
+        #***************************************************************************
 
-        obs_u = self.opt_game.observe()
+        action_u = self.user_model.take_action(action_ai)
+        ucb_socre = self.opt_game.user_action(action_u)
+
+        obs_u = self.opt_game.observe(randomness=False)
         self.user_model.update(obs_u)
 
         self.z_queries.append(obs_u)
 
         obs = (obs_u, action_u)
-        #t = len(self.z_queries)
-        #max_score = np.max(self.z_queries[:-1]) if len(self.z_queries)>1 else 0
-        #reward = self.z_queries[-1] - (t-1)/t * max_score
-        reward = np.max(self.z_queries)
+
+        #***************************************************************************
+        #reward = np.max(self.z_queries)
+        #***************************************************************************
+        #reward = avg_topk_ucb + np.max(self.z_queries)
+        #***************************************************************************
+        """
+        t = len(self.z_queries)
+        max_score = np.max(self.z_queries[:-1]) if len(self.z_queries)>1 else 0
+        modified_expected_improvement = self.z_queries[-1] - (t-1)/t * max_score
+        if modified_expected_improvement < 0:
+            modified_expected_improvement = 0
+        #reward += avg_topk_ucb
+        #"""
+        #***************************************************************************
+        #reward = 5 * (t-1)/t * modified_expected_improvement + avg_ucb_user
+        #reward = 2 * modified_expected_improvement + avg_ucb_user
+        #reward = 5 * (t-1)/t * modified_expected_improvement + avg_ucb_user + avg_topk_ucb
+        #reward = modified_expected_improvement + avg_ucb_user + avg_topk_ucb
+        #***************************************************************************
+        #reward = avg_ucb_user      #141
+        #reward = avg_topk_ucb      #142
+        reward = avg_ucb_user + avg_topk_ucb      #143
+        
+
+        info_dict = {}
+        info_dict["ucb"] = ucb_socre
+
+        #reward = np.max(self.z_queries+[self.user_model.observe(randomness=True)])
         done = self.opt_game.is_done()
 
-        return obs, reward, done, {}
+        return obs, reward, done, info_dict
+
+    
+    def give_y_dist(self, y_dist):
+        self.y_dist = y_dist
 
 
     def update_usermodel(self, alpha, beta):

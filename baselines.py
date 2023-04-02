@@ -10,20 +10,26 @@ class UBC:
         self.x_arms, self.y_arms = n_arms
         x, y = np.meshgrid(np.arange(self.x_arms), np.arange(self.y_arms))
         self.all_points = np.vstack((x.flatten(), y.flatten())).T
-        self.xy_p = user_data
-        self.xy_p = np.append(self.xy_p, agent_data).reshape(-1,2)
-        #print(user_data)
-        #print(agent_data)
-        #print(self.xy_p)
-        self.z_p = self.__query(self.xy_p)
+        if len(user_data) == 0:
+            self.xy_p = np.array(agent_data).reshape(-1,2)
+            self.z_p = self.__query(self.xy_p)
+            if len(agent_data) == 0:
+                self.xy_p = np.array([])
+                self.z_p = np.array([])
+        elif len(agent_data) == 0:
+                self.xy_p = np.array(user_data).reshape(-1,2)
+                self.z_p = self.__query(self.xy_p)
+        else:
+            self.xy_p = np.append(user_data, agent_data).reshape(-1,2)
+            self.z_p = self.__query(self.xy_p)
         self.xy_queries = []
         self.z_queries = []
         self.__fit_gp()
 
 
-    def run(self, max_iter):
+    def run(self, max_iter, top_k=1):
         for _ in range(max_iter):
-            self.take_action()
+            self.take_action(top_k)
             z = self.__query()
             self.z_queries.append(z)
             self.__fit_gp()
@@ -36,6 +42,8 @@ class UBC:
     def __query(self, points=None):
         if points is None:
             return self.function_df[self.cur[1], self.cur[0]]
+        elif len(points) == 0:
+            return None
         else: 
             return self.function_df[points[:,1], points[:,0]]
 
@@ -46,10 +54,11 @@ class UBC:
         """
         xy = np.append(self.xy_p, self.xy_queries).reshape(-1,2)
         z = np.append(self.z_p, self.z_queries)
-        self.gp.fit(xy, z)
+        if xy.size > 0:
+            self.gp.fit(xy, z)
 
     
-    def take_action(self, beta=0.2):
+    def take_action(self, top_k, beta=0.2):
         """
         choosing y for the given x in self.cur to query
         eps: int
@@ -59,7 +68,11 @@ class UBC:
         points = self.all_points[points_idx]
         mu, std = self.current_prediction(points)
         ucb_scores = utils.eval_ucb_scores(mu, std, beta)
-        self.cur = points[np.argmax(ucb_scores)]        
+        if top_k < 1:
+            top_k = 1
+        idx_topk = np.argpartition(ucb_scores, -top_k)[-top_k:]
+        idx = np.random.choice(idx_topk)
+        self.cur = points[idx]
         self.xy_queries.append(self.cur)
 
     

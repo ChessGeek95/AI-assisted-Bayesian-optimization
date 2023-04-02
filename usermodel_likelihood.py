@@ -98,7 +98,7 @@ class UsermodelLikelihood:
 
     def likelihood(self,ucb_scores,sigma):
         sumPhi = self.sum_Phi_vec(0,ucb_scores,sigma)
-        likelihood = - np.sum(sumPhi)/self.m
+        likelihood = - np.sum(sumPhi)  #old: - np.sum(sumPhi)/self.m
         return likelihood
 
     # def likelihood_grad(self,ucb_scores,sigma):

@@ -10,7 +10,7 @@ from copy import deepcopy as cpy
 
 
 
-class BAMCTS:
+class BAMCTS_v2:
     """
     Base class for BAMCTS based on Bayes Adaptive Monte Carlo Tree Search for AI-assistant 
     in the defined 2D optimization task
@@ -32,6 +32,26 @@ class BAMCTS:
         self.env = env
         self.K = K
         self.root = StateNode(state=initial_obs, is_root=True)
+        self.y_dist_condx = {}
+
+    
+    def find_y_distribution(self, x_action):
+        y_dist = np.zeros((self.env.opt_game.y_arms,))
+        for idx in range(int(self.alpha_u.shape[0] * 1.)):
+            alpha_u = self.alpha_u[idx]
+            beta_u = self.beta_u[idx]
+            y = self._predict_y(x_action, alpha_u, beta_u)
+            y_dist[y] += 1
+        y_dist = y_dist/np.sum(y_dist)
+        return y_dist
+
+    
+    def _predict_y(self, x_action, alpha, beta):
+        internal_env = cpy(self.env)
+        internal_env.update_usermodel(alpha, beta)
+        obs, r, done, _ = internal_env.step(x_action)
+        y = obs[1]
+        return y
 
 
     def learn(self, n_sim, progress_bar=False):
@@ -74,9 +94,20 @@ class BAMCTS:
 
             a = self.select(state_node)
 
+            if not a in self.y_dist_condx.keys():
+                y_dist = self.find_y_distribution(a)
+                self.y_dist_condx[a] = y_dist
+            else:
+                y_dist = self.y_dist_condx[a]
+            #internal_env.give_y_dist(y_dist)
+
             new_action_node = state_node.next_action_node(a)
 
-            new_state_node, r = self.select_outcome(internal_env, new_action_node)
+            new_state_node, r, ucb_score = self.select_outcome(internal_env, new_action_node, y_dist)
+            
+            ########################################################################################
+            new_action_node.cumulative_reward += ucb_score       #### incorporating prior knowledge ####
+            ########################################################################################
 
             new_state_node = self.update_state_node(new_state_node, new_action_node)
 
@@ -149,7 +180,7 @@ class BAMCTS:
         return R
     
 
-    def select_outcome(self, env, action_node):
+    def select_outcome(self, env, action_node, y_dist=None):
         """
         Given a ActionNode returns a StateNode
 
@@ -160,8 +191,9 @@ class BAMCTS:
         :return: StateNode
             the selected state node and corresponding reward
         """
-        new_state_index, r, done, _ = env.step(action_node.action)        
-        return StateNode(state=new_state_index, parent=action_node, is_final=done), r
+        new_state_index, r, done, info_dict = env.step(action_node.action, y_dist)
+        init_ucb_score = info_dict["ucb"]
+        return StateNode(state=new_state_index, parent=action_node, is_final=done), r, init_ucb_score
 
 
     def select(self, state_node):
@@ -282,7 +314,7 @@ class BAMCTS:
 
 
 
-class BASPW(BAMCTS):
+class BASPW(BAMCTS_v2):
     """
     Simple Progressive Widening trees based on Monte Carlo Tree Search for Continuous and
     Stochastic Sequential Decision Making Problems, Courtoux

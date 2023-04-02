@@ -7,8 +7,8 @@ import numpy as np
 from utils import PATH
 
 
-n_trials = 25
-expr = "exp_1"
+n_trials = 50
+expr = "exp_7"
 
 init_gp_list = []
 user_data_list = []
